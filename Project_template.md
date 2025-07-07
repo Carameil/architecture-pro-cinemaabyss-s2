@@ -2,10 +2,133 @@
 
 ## Задание 1
 
-1. Спроектируйте to be архитектуру КиноБездны, разделив всю систему на отдельные домены и организовав интеграционное взаимодействие и единую точку вызова сервисов.
-Результат представьте в виде контейнерной диаграммы в нотации С4.
-Добавьте ссылку на файл в этот шаблон
-[ссылка на файл](ссылка)
+### 1. Спроектированная To-Be архитектура CinemaAbyss
+
+На основе анализа текущей монолитной архитектуры и бизнес-требований платформы CinemaAbyss, спроектирована микросервисная архитектура, разделенная на следующие домены и ограниченные контексты:
+
+#### Выделенные домены и поддомены:
+
+**1. User Domain (Core Domain)**
+- **User Management** - управление профилями пользователей
+- **Authentication & Authorization** - аутентификация и управление доступом
+- **User Preferences** - персональные настройки и предпочтения
+
+**2. Content Domain (Core Domain)**
+- **Movie Catalog** - каталог фильмов и метаданные
+- **Genres Management** - управление жанрами
+- **Ratings & Reviews** - рейтинги и отзывы пользователей
+
+**3. Billing Domain (Core Domain)**
+- **Payment Processing** - обработка платежных транзакций
+- **Subscription Management** - управление подписками и тарифными планами
+- **Billing History** - история платежей и счетов
+
+**4. Analytics Domain (Supporting Domain)**
+- **Viewing Analytics** - сбор данных о просмотрах пользователей
+- **Recommendations Integration** - интеграция с внешними рекомендательными системами
+- **User Behavior Analytics** - анализ поведения пользователей
+
+**5. Notification Domain (Supporting Domain)**
+- **Email Notifications** - email-уведомления
+- **Push Notifications** - push-уведомления
+- **In-App Messages** - внутренние сообщения
+
+#### Ограниченные контексты (Bounded Contexts):
+
+**1. User Context**
+- Управление пользователями, профилями, аутентификацией
+- Владеет данными: users, user_profiles, user_sessions, user_roles
+
+**2. Content Context**
+- Управление каталогом фильмов, жанрами, метаданными
+- Владеет данными: movies, genres, movie_genres, movie_metadata
+
+**3. Payment Context**
+- Обработка платежей, интеграция с платежными системами
+- Владеет данными: payments, payment_methods, transactions
+
+**4. Subscription Context**
+- Управление подписками, тарифными планами
+- Владеет данными: subscriptions, subscription_plans, subscription_history
+
+**5. Analytics Context**
+- Сбор и анализ данных о поведении пользователей
+- Владеет данными: viewing_history, user_analytics, recommendations
+
+**6. Notification Context**
+- Отправка уведомлений по различным каналам
+- Владеет данными: notification_templates, notification_history
+
+#### Выделенные микросервисы:
+
+**Core Services:**
+1. **User Service (Go)** - управление пользователями, аутентификация, профили
+2. **Movie Service (Go)** - каталог фильмов, метаданные, жанры, рейтинги
+3. **Payment Service (Java Spring)** - обработка платежей, интеграция с платежными системами
+4. **Subscription Service (Java Spring)** - управление подписками и тарифными планами
+
+**Supporting Services:**
+5. **Analytics Service (Go)** - сбор аналитики, интеграция с внешними рекомендательными системами
+6. **Notification Service (Go)** - отправка уведомлений по email и push
+7. **Event Service (Java Spring)** - обработка событий, интеграция с Kafka
+
+**Infrastructure Services:**
+8. **API Gateway (Kong/Nginx)** - единая точка входа, маршрутизация, аутентификация
+
+#### Интеграционное взаимодействие:
+
+**1. Синхронное взаимодействие (REST API):**
+- Через API Gateway для всех внешних запросов
+- Прямые service-to-service вызовы для критических операций
+
+**2. Асинхронное взаимодействие (Event-Driven):**
+- Apache Kafka для событийной архитектуры
+- События: UserCreated, PaymentProcessed, SubscriptionActivated, MovieViewed
+
+**3. Единая точка вызова:**
+- API Gateway (Proxy Service) как единая точка входа
+- Маршрутизация, аутентификация, rate limiting
+- Паттерн Strangler Fig для постепенной миграции
+
+### Диаграммы C4
+
+#### Context диаграмма
+[Context диаграмма CinemaAbyss To-Be](https://www.planttext.com?text=hLPDR-Cs4BthLymQFJY15H-wlInGO1t7cqqH9q7ixAAdW1R7CW6AL4dANc_H_zuPYdByaGGzD1T5v7ozDsz6_ko3SA6fTFP1cK8t4c4LGkq_3OTER2vA5LRDel7e2ci2cd1Hs6fOQs7O9_T1QhKOZZ_c3tpqDBqTLi87T7JqF6QF7-6YvkZP1ubBPH2k9jzknlTti_-G9ZIraExNbtIARlCbMUI-TYgWxx99NFETtsNvSdyt7tsVpEwda_yrKJmJ6_Ismlot5yuwL4E7eaYGJozhwqFfqF-bZopsoXroSVwT-wNIrJlNXKEfmdCXd7pFIjictMUtep_ld-RFts_cNvzl9zUJkwl-MPO55JJ2-2EaDiAL4gKJ5UGm9eOhCLfilOUvpIyHHgvO4Kr5Q1ncsGC1iARFG0RGUw97ZvwaaB2qhW8-XytAmiBPZKSFbLqhz0EeX14blVjcuGkdwg2efI2CX8q8nOfkKjCet2zjOtxlHRfwPrrI8IjbADk8dye79uADwSUjQqhI5Y2aFCqU0yQibJMAlAcWBJM_WXKA7LQl9SzcqUBvqZP62hVj5v4YmHHnxZt2EXfwP_1t1lJNklRhTFwMEPrFLU4iPIIjeyyNmgDigmV2YO80bz25WGqflQMw1LOH-45781GY26tBmG7Ni51QSn06xv0cWvoaY6tOHyqA9D3_x61FVeH-BRQSube4t8WjzxizW7J20CWEdH4QaZ7KpX8KppaJn_rPe6fm0EJ-8FG0C1GNP_lPzmHEHUnLG9mfFMlfuMJy2kdz87iq18bQhT5j8J4AH1iO6zHI5IrcAeRmNpib1p0bbx8nXvNm41tMSCZQwE66yZuUd04T7bGplSrhkq52TSGve2bvbt5TTLItqEhdIy-RakHwqfokgEmHTHh1FMbTlZ5oeYX8kYIGqqdhVPtF7sR3nybi7ci_Yv7JdEs5dgPGoNDmF3u3M96kT9emAh-khNixmKlaKsMrgZdQ59sTtuKyYNIa4EwkFsevIrzeTE-5UQt9rnZyQrqw7QDTq8moau4gLm7iSaSbBONpyxbm9OQ3lGfVKF3JVpe_9viSNbi7OdyHin5LrqrW559Z22mR5anXD9ciYRLSEfe60rmjsRHqnEiR8x4c03oltQZuGl2YYFTNj4euEQFV6TGYiBoZmRKJiY6XLug-7x5JIsShbeVLjAGoYirDm4I8ncNaWrKIkU0F2FnX6sTmss5lTPmuJiiiNioGAOXjf3KLUFr5gSVBRmetoKTY82sq_UQgJDcQF19NoQNLWfGGB2p5siOV0YtpKUg7wcFZJe4jREhVWI2Ef72CUs5385e8-Oc-8Wr7Q-I6fYpnsP4oybjJh1pnslYzrTeI5kL1VeHim_jsHHz7wxRnCZASM6Y1E5pIHZ950ZosMek5PPCr9c8vyWk4p_Gl_Pg0Vm40)
+
+#### Контейнерная диаграмма  
+[Контейнерная диаграмма CinemaAbyss To-Be](https://www.planttext.com?text=bLVDKkGs4BxxAPIvx505p6LFEUtm4o0BnC53g9mesHOpAcp9aUI1gQqyJDueZvIMBDkIfO4C1yPgTtzgTN_gRd-J2WlLrbNo4sL5rPO4RPHgvC-BXS1lfskgDctUIY8ApXHXwhJWzQAfCDCs9rAL5SqNvrzFKYrwlBjTr5Wg8a3qV0uMc38YJXkDdzmk__pjSVNyTBEwVhwzlBgylvWV9OcYgYBe_2iQrD45nMk1QtI2pc5TusM-anAj-CaPGKjHRAWYXMe5IPAK2CdPNFjtZ6QFy3E3NzSAN5KlNDH8wyoEUWjSrfI1wbB_Kga4LjpOtc66rqGYUro4MOda3evKWt6IcQVdotSrR_2k1eKhhCWRte5bsWcGbMWmq2E2uGfPPOk4vfaIj27726nIN1q1j8CCljCg8s9B2w91z1BPjOTg597itW0eOUMLeEK4JX186UnUOaKvMwOt0F7WoH08FM3V93p_6M_XdTZDYp7IaxYdDkwp8_GZGV0tf7V-Hl9bqu3-4yaHF5MqCFlCZ6EuK3FxZa8An0k6im6IIQ049tomckUq8XtUdNcEGg9xM6zD-AmMThIce8OTAHSALpr7KBVqV7J80zYZknPl2jhGaImGSPSetpbRB-xNbBthLKRP6Zm4meWTQZZW7YF1MmNYOuHRjO4tlklctnVOJ92UANAolGxVI2fzLLnENV5PBwtD3T1qtREP6_mj9IFedLw6g9qO8735uG0rKHY8XGCqUqb6lFv6EOY_uYr6MICW53D7en4SJYorT8egsrmMSDlq0KRep95-WE-fZO7nevwrJGFa09DziGV3QWTHbAC3oruKncjyfOkFVnUbOTbQnFF1kA8lDbdZLlUEDDpDUrkI2fWiTW4osNgPkTnEyj9XTU8W6JPE5v1qb46TdSRd8ZVilCXx2chD74k3d7Afre9alzyE38sn1p0C6mr8nxZzA1uZ8qYMYGQhfzX-j5vZZrik0GsYHwhzi9xQ7ko1M0Pu98wB-ky_KETUhtdRBKq4SxB1Mmf5LJDi075tiJcxOIy26hfekuRha-8LlxnYlM-3Ymr1t_NILBF-eUD33MI0YuDomLzD3vwUGf2IIbDOuHUTQx1PlpJz72JwTfbUh9a5zo1aQ0L-mY48XWb1x-skPp61nm9avKV9tqdo1PaecO8EjLxlbpoGoiuPG_y29UFVzMgLPc0vghXTAQPbnm-_pzZHmzK5JtuHPX8faUBe31Uly6WWUY-2jYB8NosHQiHPF5ncAxknuzXXXfwh_zyK3k2qkhwBTOWEYD-S7a0BHh0fgEUEOppfGWTQ1rtdGFjuVpaG9D8W3aI8b_vFG20xLbUpgoyQ0uy7dA4wm-XJoiMJW0dSWEbIrHFBJS9OYlTRJ0Fl5jtzLj5m1oLsltqOQR-6nYqXKAQMdPG2-YD3kYMtp8OxZ5TV6DCshwZSG0PC_vH3SKIfu8eNl8f6xs3pQIWF1eX6zI0K0-DF2Rsz6zBF70dJqwFOTfW31d3r4vZeRJWOIL-F7IisK86XUmuVMa5RY4RFBsb_u8f2TuKjM_kHEhtCKP2WEDqmggZ1iQ-YTI48ugH4NX4bEzauZOUbOVWST4PE-T7LTRw5kn5mT3FeWD4CJRvyzGUjx8HX1mtE6FlEDGUTJD2J_cg7Y_0IzrD9raqSC2YuSyd7DxYtlRFH_SJOBUJ3C0G2LD6QAlij4bYQwgs7beW3qsdeXfNadTYa3o68R3yrx8QaSMYoPiatY6TRL-W_)
+
+#### Ключевые архитектурные решения:
+
+**1. API Gateway (Proxy Service)**
+- Единая точка входа для всех клиентов
+- Реализация паттерна Strangler Fig для постепенной миграции
+- Централизованная аутентификация и авторизация
+- Rate limiting и защита от DDoS
+
+**2. Event-Driven Architecture**
+- Apache Kafka как центральная шина событий
+- Асинхронная коммуникация между сервисами
+- Event Sourcing для критических операций
+- Гарантированная доставка сообщений
+
+**3. Database per Service**
+- Каждый сервис владеет своими данными
+- PostgreSQL для всех транзакционных данных включая аналитику
+- Redis для кэширования
+- Elasticsearch для поиска по каталогу фильмов
+
+**4. Постепенная миграция**
+- Movies Service уже извлечен из монолита
+- Следующие кандидаты: User Service, Payment Service  
+- Монолит остается до полной миграции всех доменов
+- Feature flags для управления трафиком между монолитом и микросервисами
+
+**5. Analytics Service для рекомендаций**
+- Analytics Service необходим для интеграции с внешними рекомендательными системами
+- Собирает данные о поведении пользователей (просмотры, рейтинги, избранное)
+- Передает аналитику во внешние ML-системы для генерации персональных рекомендаций
+- Все взаимодействие с пользователем остается синхронным, как и было в As-Is архитектуре
 
 
 ## Задание 2

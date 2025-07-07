@@ -1,0 +1,62 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include DEVICONS/react.puml
+!include DEVICONS/postgresql.puml
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/film.puml
+!include FONTAWESOME/credit_card.puml
+!include FONTAWESOME/cloud.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 Context Diagram - CinemaAbyss To-Be Architecture
+
+Person(user, "User", "Platform user who browses movies, manages subscriptions and watches content", $sprite="users")
+Person(admin, "Administrator", "Content manager who adds movies, manages users and monitors system health", $sprite="users")
+
+System_Boundary(cinemaabyss, "CinemaAbyss Platform") {
+    System(platform, "CinemaAbyss Platform", "Microservices-based movie streaming platform with user management, content catalog, subscription billing and recommendations", $sprite="film")
+}
+
+System_Ext(paymentGateway, "Payment Gateway", "External payment processing system (Stripe, PayPal, etc.)", $sprite="credit_card")
+System_Ext(emailService, "Email Service", "External email delivery service for notifications (SendGrid, Mailgun)", $sprite="cloud")
+System_Ext(recommendationAPI, "Recommendation API", "External ML-powered recommendation engine for personalized movie suggestions", $sprite="cloud")
+
+Rel(user, platform, "Browses movies, manages account, watches content", "HTTPS/REST API")
+Rel(admin, platform, "Manages content, monitors system, handles user support", "HTTPS/REST API")
+Rel(platform, paymentGateway, "Processes subscription payments", "HTTPS")
+Rel(platform, emailService, "Sends notifications and alerts", "HTTPS")
+Rel(platform, recommendationAPI, "Gets personalized movie recommendations", "HTTPS")
+
+note right of platform
+  **Target Architecture Features:**
+  - Microservices-based architecture
+  - API Gateway for unified access
+  - Event-driven communication
+  - Independent service scaling
+  - Database per service pattern
+  - Gradual migration from monolith
+end note
+
+note left of user
+  **User Journey:**
+  - Browse movie catalog
+  - Search and filter movies
+  - View movie details and ratings
+  - Rate movies and add to favorites
+  - Manage subscription and payments
+  - Get personalized recommendations
+end note
+
+note bottom of recommendationAPI
+  **Recommendation Integration:**
+  - Asynchronous processing
+  - Based on viewing history
+  - User ratings and preferences
+  - Collaborative filtering
+end note
+
+@enduml 
