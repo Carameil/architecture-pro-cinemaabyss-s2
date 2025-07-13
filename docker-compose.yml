@@ -6,9 +6,9 @@ services:
     image: postgres:14
     container_name: cinemaabyss-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_password
-      POSTGRES_DB: cinemaabyss
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cinemaabyss}
     ports:
       - "5432:5432"
     volumes:
@@ -112,12 +112,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      PORT: 8000
-      MONOLITH_URL: http://monolith:8080
-      MOVIES_SERVICE_URL: http://movies-service:8081
-      EVENTS_SERVICE_URL: http://events-service:8082
-      GRADUAL_MIGRATION: "true"
-      MOVIES_MIGRATION_PERCENT: "50"
+      PORT: ${PROXY_SERVICE_PORT:-8000}
+      MONOLITH_URL: ${MONOLITH_URL:-http://monolith:8080}
+      MOVIES_SERVICE_URL: ${MOVIES_SERVICE_URL:-http://movies-service:8081}
+      EVENTS_SERVICE_URL: ${EVENTS_SERVICE_URL:-http://events-service:8082}
+      GRADUAL_MIGRATION: ${GRADUAL_MIGRATION:-true}
+      MOVIES_MIGRATION_PERCENT: ${MOVIES_MIGRATION_PERCENT:-50}
     networks:
       - cinemaabyss-network
 

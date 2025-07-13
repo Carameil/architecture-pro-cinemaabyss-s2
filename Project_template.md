@@ -133,54 +133,188 @@
 
 ## Задание 2
 
-### 1. Proxy
-Команда КиноБездны уже выделила сервис метаданных о фильмах movies и вам необходимо реализовать бесшовный переход с применением паттерна Strangler Fig в части реализации прокси-сервиса (API Gateway), с помощью которого можно будет постепенно переключать траффик, используя фиче-флаг.
+### Реализация микросервисов Proxy и Events
 
+В рамках второго задания были реализованы два ключевых сервиса для поддержки миграции от монолитной архитектуры к микросервисной: Proxy Service (API Gateway) и Events Service.
 
-Реализуйте сервис на любом языке программирования в ./src/microservices/proxy.
-Конфигурация для запуска сервиса через docker-compose уже добавлена
+Подробная инструкция по запуску и тестированию доступна в файле [APP_INFO.md](APP_INFO.md).
+
+### 1. Proxy Service (API Gateway)
+
+#### Реализация
+Proxy Service был реализован на языке Go в директории `./src/microservices/proxy` в соответствии с архитектурой из задания 1. Сервис реализует паттерн Strangler Fig для постепенной миграции трафика от монолита к микросервисам.
+
+#### Ключевые особенности:
+- **Паттерн Strangler Fig**: Постепенная миграция трафика с использованием вероятностного распределения
+- **Конфигурируемая маршрутизация**: Процент миграции управляется через переменную окружения `MOVIES_MIGRATION_PERCENT`
+- **Единая точка входа**: Все клиентские запросы проходят через прокси на порту 8000
+- **Логирование решений**: Каждое решение о маршрутизации логируется для мониторинга
+5
+#### Маршрутизация:
+- `/api/movies` - распределяется между монолитом и Movies Service согласно проценту миграции
+- `/api/events/*` - всегда направляется на Events Service
+- `/api/users`, `/api/payments`, `/api/subscriptions` - направляются на монолит
+- `/health` - health check endpoint самого прокси
+
+#### Конфигурация через docker-compose:
 ```yaml
-  proxy-service:
-    build:
-      context: ./src/microservices/proxy
-      dockerfile: Dockerfile
-    container_name: cinemaabyss-proxy-service
-    depends_on:
-      - monolith
-      - movies-service
-      - events-service
-    ports:
-      - "8000:8000"
-    environment:
-      PORT: 8000
-      MONOLITH_URL: http://monolith:8080
-      #монолит
-      MOVIES_SERVICE_URL: http://movies-service:8081 #сервис movies
-      EVENTS_SERVICE_URL: http://events-service:8082 
-      GRADUAL_MIGRATION: "true" # вкл/выкл простого фиче-флага
-      MOVIES_MIGRATION_PERCENT: "50" # процент миграции
-    networks:
-      - cinemaabyss-network
+proxy-service:
+  build:
+    context: ./src/microservices/proxy
+    dockerfile: Dockerfile
+  container_name: cinemaabyss-proxy-service
+  depends_on:
+    - monolith
+    - movies-service
+    - events-service
+  ports:
+    - "8000:8000"
+  environment:
+    PORT: ${PROXY_SERVICE_PORT:-8000}
+    MONOLITH_URL: ${MONOLITH_URL:-http://monolith:8080}
+    MOVIES_SERVICE_URL: ${MOVIES_SERVICE_URL:-http://movies-service:8081}
+    EVENTS_SERVICE_URL: ${EVENTS_SERVICE_URL:-http://events-service:8082}
+    GRADUAL_MIGRATION: ${GRADUAL_MIGRATION:-true}
+    MOVIES_MIGRATION_PERCENT: ${MOVIES_MIGRATION_PERCENT:-50}
+  networks:
+    - cinemaabyss-network
 ```
 
-- После реализации запустите postman тесты - они все должны быть зеленые.
-- Отправьте запросы к API Gateway:
-   ```bash
-   curl http://localhost:8000/api/movies
-   ```
-- Протестируйте постепенный переход, изменив переменную окружения MOVIES_MIGRATION_PERCENT в файле docker-compose.yml.
+#### Тестирование постепенной миграции:
+```bash
+# Проверка текущего процента
+make show-migration
 
-### 2. Kafka
- Вам как архитектуру нужно также проверить гипотезу насколько просто реализовать применение Kafka в данной архитектуре.
+# Изменение процента миграции
+make set-migration PERCENT=75
+docker-compose restart proxy-service
 
-Для этого нужно сделать MVP сервис events, который будет при вызове API создавать и сам же читать сообщения в топике Kafka.
+# Тестирование маршрутизации
+make test-proxy
+```
 
-    - Разработайте сервис на любом языке программирования с consumer'ами и producer'ами.
-    - Реализуйте простой API, при вызове которого будут создаваться события User/Payment/Movie и обрабатываться внутри сервиса с записью в лог
-    - Добавьте в docker-compose новый сервис, kafka там уже есть
+### 2. Events Service
 
-Необходимые тесты для проверки этого API вызываются при запуске npm run test:local из папки tests/postman 
-Приложите скриншот тестов и скриншот состояния топиков Kafka http://localhost:8090 
+#### Реализация
+Events Service был реализован на Java Spring Boot в директории `./src/microservices/events` в соответствии с архитектурой из задания 1. Сервис демонстрирует MVP реализацию событийной архитектуры с использованием Apache Kafka.
+
+#### Ключевые особенности:
+- **Producer и Consumer в одном сервисе**: MVP реализация для демонстрации работы с Kafka
+- **Три типа событий**: UserEvent, PaymentEvent, MovieEvent
+- **REST API для создания событий**: POST endpoints для каждого типа события
+- **Автоматическая обработка**: Consumer логирует все полученные события
+- **Автоматическое создание топиков**: При старте создаются топики user-events, payment-events, movie-events
+
+#### API Endpoints:
+- `GET /api/events/health` - health check
+- `POST /api/events/user` - создание пользовательского события
+- `POST /api/events/payment` - создание платежного события
+- `POST /api/events/movie` - создание события о фильме
+
+#### Пример создания события:
+```bash
+curl -X POST http://localhost:8000/api/events/movie \
+  -H "Content-Type: application/json" \
+  -d '{
+    "movieId": 1,
+    "title": "The Matrix",
+    "action": "VIEWED",
+    "userId": 123
+  }'
+```
+
+#### Просмотр обработанных событий:
+```bash
+# Через Makefile
+make events-logs
+
+# Или напрямую
+docker logs cinemaabyss-events-service --tail 50 | grep "CONSUMED"
+```
+
+### 3. Результаты тестирования
+
+#### Postman тесты
+Все 42 теста успешно проходят после исправления assertion для Events Service health check:
+![img.png](images/testResult.png)
+
+#### Демонстрация работы Strangler Fig
+При MOVIES_MIGRATION_PERCENT=50% трафик распределяется примерно поровну:
+```
+2025/07/13 22:18:10 Routing /api/movies to Monolith
+2025/07/13 22:18:11 Routing /api/movies to Monolith
+2025/07/13 22:18:12 Routing /api/movies to new Movies Service
+2025/07/13 22:18:13 Routing /api/movies to new Movies Service
+2025/07/13 22:18:14 Routing /api/movies to Monolith
+```
+
+При MOVIES_MIGRATION_PERCENT=100% весь трафик идет на новый сервис:
+```
+2025/07/13 22:19:54 Routing /api/movies to new Movies Service
+2025/07/13 22:19:54 Routing /api/movies to new Movies Service
+2025/07/13 22:19:54 Routing /api/movies to new Movies Service
+2025/07/13 22:19:54 Routing /api/movies to new Movies Service
+2025/07/13 22:19:54 Routing /api/movies to new Movies Service
+```
+
+#### Kafka события
+События успешно создаются и обрабатываются:
+```
+=== CONSUMED USER EVENT ===
+Event ID: d229b750-2e56-4152-9734-fa5200a6baa2
+User ID: 123
+Action: LOGIN
+Details: User logged in
+Timestamp: 2025-07-13T22:17:22.802642825
+
+=== CONSUMED PAYMENT EVENT ===
+Event ID: e25f24d2-4457-4656-890b-79642a35f392
+Payment ID: 456
+User ID: 123
+Amount: 99.99
+Status: COMPLETED
+
+=== CONSUMED MOVIE EVENT ===
+Event ID: 009bc3c7-5306-4fc5-8442-f2303678f11f
+Movie ID: 1
+Title: The Matrix
+Action: VIEWED
+User ID: 123
+```
+
+![img_1.png](images/topicsState.png)
+![img_2.png](images/movieTopicMessage.png)
+
+### 4. Дополнительные улучшения
+
+#### Makefile
+Создан Makefile для удобного управления Docker-окружением с командами для:
+- Управления сервисами (up, down, restart, logs)
+- Тестирования (test, test-proxy, test-events)
+- Мониторинга (health, ps, show-migration)
+- Конфигурации (set-migration)
+
+#### Переменные окружения
+Создан `.env.example` файл с конфигурацией, которая копируется в `.env`:
+- Настройки базы данных
+- Порты сервисов
+- URL для внутренней коммуникации
+- Параметры миграции
+- Конфигурация Kafka
+
+#### Документация
+Создан файл [APP_INFO.md](APP_INFO.md) с подробными инструкциями по:
+- Запуску приложения с нуля
+- Тестированию всех компонентов
+- Использованию Makefile
+- Решению типичных проблем
+
+### Заключение
+
+Реализованы оба требуемых сервиса с простой, но достаточной функциональностью для демонстрации:
+- Паттерна Strangler Fig для постепенной миграции
+- Интеграции с Apache Kafka для событийной архитектуры
+- Готовности системы к дальнейшей декомпозиции монолита 
 
 
 ## Задание 3
