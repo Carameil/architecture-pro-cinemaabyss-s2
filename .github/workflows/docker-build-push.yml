@@ -132,14 +132,14 @@ jobs:
           cp .env.example .env
           
           # Start all services
-          docker-compose up -d
+          docker compose up -d
           
           # Wait for services to be ready
           echo "Waiting for services to be ready..."
           sleep 120
           
           # Check if services are healthy
-          docker-compose ps
+          docker compose ps
 
       - name: Set up Node.js for API tests
         uses: actions/setup-node@v4
@@ -170,5 +170,5 @@ jobs:
 
       - name: Stop services
         if: always()
-        run: docker-compose down -v 
+        run: docker compose down -v 
       
