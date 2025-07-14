@@ -136,7 +136,7 @@ jobs:
           
           # Wait for services to be ready
           echo "Waiting for services to be ready..."
-          sleep 60
+          sleep 15
           
           # Check if services are healthy
           docker compose ps
@@ -150,7 +150,7 @@ jobs:
 
       - name: Install Newman and dependencies
         working-directory: tests/postman
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Run API tests
         working-directory: tests/postman
@@ -167,14 +167,6 @@ jobs:
           name: api-test-results
           path: tests/postman/reports/
           retention-days: 30
-          
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: Newman Test Results
-          path: tests/postman/reports/junit-*.xml
-          reporter: java-junit
 
       - name: Stop services
         if: always()
