@@ -10,6 +10,7 @@ help:
 	@echo "make restart     - Restart all services"
 	@echo "make logs        - Show logs for all services"
 	@echo "make test        - Run Postman tests (local environment)"
+	@echo "make test-ci     - Run Postman tests in CI mode (minimal reporters)"
 	@echo "make clean       - Stop services and remove volumes"
 	@echo "make ps          - Show running containers"
 	@echo "make health      - Check health of all services"
@@ -44,6 +45,12 @@ test:
 	@echo "Installing test dependencies and running tests..."
 	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network cinemaabyss-network \
 		node:18-alpine sh -c "npm install && node run-tests.js --environment docker"
+
+# Run tests in CI mode (minimal reporters)
+test-ci:
+	@echo "Installing test dependencies and running tests in CI mode..."
+	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network cinemaabyss-network \
+		node:18-alpine sh -c "npm install --legacy-peer-deps && node run-tests.js --environment docker --reporters cli,junit"
 
 # Alternative test command using docker-compose exec
 test-local:

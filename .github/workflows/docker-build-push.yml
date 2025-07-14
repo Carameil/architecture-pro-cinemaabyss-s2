@@ -141,13 +141,8 @@ jobs:
           # Check if services are healthy
           docker compose ps
 
-      - name: Run API tests in Docker environment
-        run: |
-          # Run the tests in Docker container 
-          docker run --rm -v $(pwd)/tests/postman:/app -w /app --network cinemaabyss-network \
-            node:18-alpine sh -c "npm install --legacy-peer-deps && node run-tests.js --environment docker --reporters cli,junit"
-        env:
-          CI: true
+      - name: Run API tests using make test-ci
+        run: make test-ci
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
