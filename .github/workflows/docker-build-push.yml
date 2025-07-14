@@ -136,7 +136,7 @@ jobs:
           
           # Wait for services to be ready
           echo "Waiting for services to be ready..."
-          sleep 120
+          sleep 60
           
           # Check if services are healthy
           docker compose ps
@@ -155,8 +155,8 @@ jobs:
       - name: Run API tests
         working-directory: tests/postman
         run: |
-          # Run the tests against Docker environment
-          node run-tests.js --environment docker
+          # Run the tests against Docker environment with minimal reporters for CI
+          node run-tests.js --environment docker --reporters cli,junit
         env:
           CI: true
 
@@ -167,6 +167,14 @@ jobs:
           name: api-test-results
           path: tests/postman/reports/
           retention-days: 30
+          
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Newman Test Results
+          path: tests/postman/reports/junit-*.xml
+          reporter: java-junit
 
       - name: Stop services
         if: always()
