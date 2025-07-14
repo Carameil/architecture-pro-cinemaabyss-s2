@@ -141,22 +141,11 @@ jobs:
           # Check if services are healthy
           docker compose ps
 
-      - name: Set up Node.js for API tests
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: tests/postman/package-lock.json
-
-      - name: Install Newman and dependencies
-        working-directory: tests/postman
-        run: npm install --legacy-peer-deps
-
-      - name: Run API tests
-        working-directory: tests/postman
+      - name: Run API tests in Docker environment
         run: |
-          # Run the tests against Docker environment with minimal reporters for CI
-          node run-tests.js --environment docker --reporters cli,junit
+          # Run the tests in Docker container 
+          docker run --rm -v $(pwd)/tests/postman:/app -w /app --network cinemaabyss-network \
+            node:18-alpine sh -c "npm install --legacy-peer-deps && node run-tests.js --environment docker --reporters cli,junit"
         env:
           CI: true
 
