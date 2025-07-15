@@ -55,7 +55,7 @@ jobs:
         with:
           context: ./src/monolith
           push: true
-          load: true           # ← ключевое: грузим образ в локальный daemon
+          load: true
           tags: ${{ steps.meta-monolith.outputs.tags }}
           labels: ${{ steps.meta-monolith.outputs.labels }}
           cache-from: type=gha
@@ -130,20 +130,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Set up Docker Compose for testing
+      - name: Create .env file for Docker Compose
+        run: |
+          cp .env.example .env
+          echo "MOVIES_MIGRATION_PERCENT=50" >> .env
+          echo "GRADUAL_MIGRATION=true" >> .env
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose up -d
+          echo "Waiting for services to be ready..."
+
+      - name: Wait for services to be healthy
         run: |
           set -e
-          timeout=180   # 3 мин
+          timeout=300   # 5 minutes
           until [ $timeout -le 0 ]; do
-            unhealthy=$(docker compose ps --format json \
-              | jq -r '.[] | select(.State!="running" or (.Health!="healthy" and .Health!=""))' \
+            unhealthy=$(docker compose ps --format json 2>/dev/null \
+              | jq -r '.[] | select(.State!="running" or (.Health!="healthy" and .Health!="" and .Health!="starting"))' \
               | wc -l)
             if [ "$unhealthy" -eq 0 ]; then
-              echo "✅ Stack healthy"
+              echo "✅ All services are healthy"
+              docker compose ps
               break
             fi
-            sleep 5
-            timeout=$((timeout-5))
+            echo "Waiting for services to be healthy... ($timeout seconds left)"
+            sleep 10
+            timeout=$((timeout-10))
           done
           if [ $timeout -le 0 ]; then
             echo "❌ Services did not become healthy in time"

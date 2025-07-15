@@ -49,6 +49,9 @@ test:
 # Run tests in CI mode (minimal reporters)
 test-ci:
 	@echo "Installing test dependencies and running tests in CI mode..."
+	@echo "Checking if cinemaabyss-network exists..."
+	@docker network ls | grep cinemaabyss-network || (echo "Network not found, creating..." && docker network create cinemaabyss-network)
+	@echo "Running tests in Docker container..."
 	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network cinemaabyss-network \
 		node:18-alpine sh -c "npm install --legacy-peer-deps && node run-tests.js --environment docker --reporters cli,junit"
 

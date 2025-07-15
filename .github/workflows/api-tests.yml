@@ -27,45 +27,54 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Compose
+      - name: Create .env file for Docker Compose
         run: |
-          docker compose --version
+          cp .env.example .env
+          echo "MOVIES_MIGRATION_PERCENT=50" >> .env
+          echo "GRADUAL_MIGRATION=true" >> .env
       
       - name: Start services with Docker Compose
         run: |
           docker compose up -d
-          # Wait for services to be ready
           echo "Waiting for services to be ready..."
-          sleep 120
       
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: tests/postman/package-lock.json
-      
-      - name: Install Newman and dependencies
-        working-directory: tests/postman
-        run: npm install
+      - name: Wait for services to be healthy
+        run: |
+          set -e
+          timeout=300   # 5 minutes
+          until [ $timeout -le 0 ]; do
+            unhealthy=$(docker compose ps --format json 2>/dev/null \
+              | jq -r '.[] | select(.State!="running" or (.Health!="healthy" and .Health!="" and .Health!="starting"))' \
+              | wc -l)
+            if [ "$unhealthy" -eq 0 ]; then
+              echo "✅ All services are healthy"
+              docker compose ps
+              break
+            fi
+            echo "Waiting for services to be healthy... ($timeout seconds left)"
+            sleep 10
+            timeout=$((timeout-10))
+          done
+          if [ $timeout -le 0 ]; then
+            echo "❌ Services did not become healthy in time"
+            docker compose ps
+            docker compose logs
+            exit 1
+          fi
       
       - name: Run API tests
-        working-directory: tests/postman
-        run: |
-
-          docker compose up -d
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 15
-          # Build the Docker image
-          docker build -t cinemaabyss-api-tests .
-          
-          # Run the tests in Docker
-          docker run --network=cinemaabyss-network -v "$(pwd)/reports:/app/reports" cinemaabyss-api-tests
+        run: make test-ci
         
+      - name: Upload Postman reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-results-standalone
+          path: tests/postman/reports/
+          retention-days: 30
       
       - name: Stop services
         if: always()
-        run: docker compose down
+        run: docker compose down -v
