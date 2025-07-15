@@ -14,6 +14,9 @@ RUN mvn clean package -DskipTests
 # Runtime stage
 FROM eclipse-temurin:17-jre-alpine
 
+# Add wget for health checks
+RUN apk --no-cache add wget
+
 WORKDIR /app
 
 # Copy the JAR from builder

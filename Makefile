@@ -43,13 +43,13 @@ logs:
 # Run tests in Docker
 test:
 	@echo "Installing test dependencies and running tests..."
-	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network cinemaabyss-network \
+	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network architecture-pro-cinemaabyss-s2_cinemaabyss-network \
 		node:18-alpine sh -c "npm install && node run-tests.js --environment docker"
 
 # Run tests in CI mode (minimal reporters)
 test-ci:
 	@echo "Installing test dependencies and running tests in CI mode..."
-	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network cinemaabyss-network \
+	docker run --rm -v $(PWD)/tests/postman:/app -w /app --network architecture-pro-cinemaabyss-s2_cinemaabyss-network \
 		node:18-alpine sh -c "npm install --legacy-peer-deps && node run-tests.js --environment docker --reporters cli,junit"
 
 # Alternative test command using docker-compose exec

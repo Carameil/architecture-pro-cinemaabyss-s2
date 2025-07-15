@@ -18,7 +18,7 @@ env:
   PROXY_SERVICE_IMAGE_NAME: ${{ github.repository }}/proxy-service
 
 jobs:
-  build-and-push:
+  build-and-test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,6 +55,7 @@ jobs:
         with:
           context: ./src/monolith
           push: true
+          load: true           # ← ключевое: грузим образ в локальный daemon
           tags: ${{ steps.meta-monolith.outputs.tags }}
           labels: ${{ steps.meta-monolith.outputs.labels }}
           cache-from: type=gha
@@ -77,6 +78,7 @@ jobs:
         with:
           context: ./src/microservices/movies
           push: true
+          load: true
           tags: ${{ steps.meta-movies.outputs.tags }}
           labels: ${{ steps.meta-movies.outputs.labels }}
           cache-from: type=gha
@@ -99,6 +101,7 @@ jobs:
         with:
           context: ./src/microservices/events
           push: true
+          load: true
           tags: ${{ steps.meta-events.outputs.tags }}
           labels: ${{ steps.meta-events.outputs.labels }}
           cache-from: type=gha
@@ -121,6 +124,7 @@ jobs:
         with:
           context: ./src/microservices/proxy
           push: true
+          load: true
           tags: ${{ steps.meta-proxy.outputs.tags }}
           labels: ${{ steps.meta-proxy.outputs.labels }}
           cache-from: type=gha
@@ -128,25 +132,32 @@ jobs:
 
       - name: Set up Docker Compose for testing
         run: |
-          # Copy .env.example to .env for testing
-          cp .env.example .env
-          
-          # Start all services
-          docker compose up -d
-          
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 15
-          
-          # Check if services are healthy
-          docker compose ps
+          set -e
+          timeout=180   # 3 мин
+          until [ $timeout -le 0 ]; do
+            unhealthy=$(docker compose ps --format json \
+              | jq -r '.[] | select(.State!="running" or (.Health!="healthy" and .Health!=""))' \
+              | wc -l)
+            if [ "$unhealthy" -eq 0 ]; then
+              echo "✅ Stack healthy"
+              break
+            fi
+            sleep 5
+            timeout=$((timeout-5))
+          done
+          if [ $timeout -le 0 ]; then
+            echo "❌ Services did not become healthy in time"
+            docker compose ps
+            docker compose logs
+            exit 1
+          fi
 
-      - name: Run API tests using make test-ci
+      - name: Run API tests
         run: make test-ci
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
+      - name: Upload Postman reports
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: api-test-results
           path: tests/postman/reports/
