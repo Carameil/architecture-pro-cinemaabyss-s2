@@ -400,3 +400,246 @@ sudo sed -i '/cinemaabyss.example.com/d' /etc/hosts
    # Проверка Ingress controller
    kubectl get pods -n ingress-nginx
    ``` 
+
+## Helm (Задание 4)
+
+### Предварительные требования
+- Minikube установлен и запущен
+- kubectl настроен для работы с кластером  
+- Helm установлен (версия 3.x)
+- Доступ к GitHub Container Registry
+
+### Установка Helm (если не установлен)
+
+#### Вариант 1: Официальный скрипт установки
+```bash
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+#### Вариант 2: Прямое скачивание
+```bash
+cd ~
+curl -L https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz -o helm-v3.12.0-linux-amd64.tar.gz
+tar -zxvf helm-v3.12.0-linux-amd64.tar.gz
+sudo mv linux-amd64/helm /usr/local/bin/helm
+helm version
+```
+
+### Проверка Helm Charts
+
+1. **Проверка конфигурации values.yaml:**
+   ```bash
+   # Просмотр текущей конфигурации
+   cat src/kubernetes/helm/values.yaml | grep repository
+   
+   # Убедиться что пути к образам правильные
+   grep "ghcr.io/carameil" src/kubernetes/helm/values.yaml
+   ```
+
+2. **Проверка шаблонов:**
+   ```bash
+   # Валидация шаблонов
+   helm template cinemaabyss ./src/kubernetes/helm --namespace cinemaabyss > /tmp/helm-output.yaml
+   
+   # Проверка что шаблоны генерируются корректно
+   grep -E "(proxy-service|events-service)" /tmp/helm-output.yaml
+   ```
+
+### Развертывание через Helm
+
+1. **Очистка предыдущих развертываний:**
+   ```bash
+   # Удаление ресурсов если есть
+   kubectl delete all --all -n cinemaabyss
+   kubectl delete namespace cinemaabyss
+   
+   # Или удаление через Helm если был установлен
+   helm uninstall cinemaabyss -n cinemaabyss
+   ```
+
+2. **Установка через Helm:**
+   ```bash
+   # Перейти в корень проекта
+   cd ~/projects/architecture-pro-cinemaabyss-s2
+   
+   # Установка chart'а
+   helm install cinemaabyss ./src/kubernetes/helm --namespace cinemaabyss --create-namespace
+   ```
+
+3. **Проверка статуса установки:**
+   ```bash
+   # Статус Helm release
+   helm status cinemaabyss -n cinemaabyss
+   
+   # Список установленных charts
+   helm list -n cinemaabyss
+   ```
+
+### Проверка развертывания
+
+1. **Проверка подов:**
+   ```bash
+   kubectl get pods -n cinemaabyss
+   ```
+   **Ожидаемый результат:** 7 подов в статусе Running
+   - events-service-xxx
+   - kafka-0  
+   - monolith-xxx
+   - movies-service-xxx
+   - postgres-0
+   - proxy-service-xxx
+   - zookeeper-0
+
+2. **Проверка сервисов:**
+   ```bash
+   kubectl get services -n cinemaabyss
+   ```
+
+3. **Проверка Ingress:**
+   ```bash
+   kubectl get ingress -n cinemaabyss
+   ```
+
+### Настройка доступа
+
+1. **Включение Ingress (если не включен):**
+   ```bash
+   minikube addons enable ingress
+   ```
+
+2. **Добавление записи в hosts (если не добавлена):**
+   ```bash
+   echo "127.0.0.1 cinemaabyss.example.com" | sudo tee -a /etc/hosts
+   ```
+
+3. **Запуск туннеля (в отдельном терминале):**
+   ```bash
+   minikube tunnel
+   ```
+
+### Тестирование API
+
+1. **Проверка основной функциональности:**
+   ```bash
+   # API фильмов
+   curl http://cinemaabyss.example.com/api/movies
+   
+   # Health check Proxy Service  
+   curl http://cinemaabyss.example.com/health
+   
+   # Health check Events Service
+   curl http://cinemaabyss.example.com/api/events/health
+   ```
+
+2. **Тестирование событий:**
+   ```bash
+   # Создание тестового события
+   curl -X POST http://cinemaabyss.example.com/api/events/movie \
+     -H "Content-Type: application/json" \
+     -d '{"movieId": 1, "title": "Test Movie", "action": "VIEWED", "userId": 123}'
+   
+   # Проверка логов Events Service
+   kubectl logs -n cinemaabyss deployment/events-service --tail 20 | grep "CONSUMED"
+   ```
+
+3. **Запуск полного набора тестов:**
+   ```bash
+   cd tests/postman
+   npm run test:kubernetes
+   ```
+
+### Управление конфигурацией через Helm
+
+1. **Изменение конфигурации:**
+   ```bash
+   # Обновление процента миграции в values.yaml
+   sed -i 's/moviesMigrationPercent: "100"/moviesMigrationPercent: "50"/' src/kubernetes/helm/values.yaml
+   
+   # Применение изменений
+   helm upgrade cinemaabyss ./src/kubernetes/helm -n cinemaabyss
+   ```
+
+2. **Переопределение значений через командную строку:**
+   ```bash
+   # Установка с переопределением значений
+   helm install cinemaabyss ./src/kubernetes/helm \
+     --namespace cinemaabyss --create-namespace \
+     --set config.moviesMigrationPercent=75 \
+     --set proxyService.replicas=2
+   ```
+
+3. **Откат к предыдущей версии:**
+   ```bash
+   # Просмотр истории
+   helm history cinemaabyss -n cinemaabyss
+   
+   # Откат к предыдущей версии
+   helm rollback cinemaabyss 1 -n cinemaabyss
+   ```
+
+### Мониторинг и отладка
+
+1. **Просмотр логов сервисов:**
+   ```bash
+   # Логи Proxy Service
+   kubectl logs -n cinemaabyss deployment/proxy-service --tail 50
+   
+   # Логи Events Service  
+   kubectl logs -n cinemaabyss deployment/events-service --tail 50
+   
+   # Логи всех подов
+   kubectl logs -n cinemaabyss -l app=proxy-service --tail 20
+   ```
+
+2. **Проверка конфигурации:**
+   ```bash
+   # Просмотр ConfigMap
+   kubectl get configmap cinemaabyss-config -n cinemaabyss -o yaml
+   
+   # Просмотр текущих значений Helm
+   helm get values cinemaabyss -n cinemaabyss
+   ```
+
+### Решение проблем
+
+1. **Ошибка доступа к образам:**
+   ```bash
+   # Проверка секрета
+   kubectl get secret dockerconfigjson -n cinemaabyss -o yaml
+   
+   # Пересоздание через Helm
+   helm upgrade cinemaabyss ./src/kubernetes/helm -n cinemaabyss --recreate-pods
+   ```
+
+2. **Проблемы с Kafka ClusterID:**
+   ```bash
+   # Полная очистка с PVC
+   helm uninstall cinemaabyss -n cinemaabyss
+   kubectl delete pvc --all -n cinemaabyss  
+   kubectl delete namespace cinemaabyss
+   
+   # Повторная установка
+   helm install cinemaabyss ./src/kubernetes/helm --namespace cinemaabyss --create-namespace
+   ```
+
+3. **Отладка шаблонов Helm:**
+   ```bash
+   # Проверка генерируемых манифестов
+   helm template cinemaabyss ./src/kubernetes/helm --debug
+   
+   # Сухой запуск для проверки
+   helm install cinemaabyss ./src/kubernetes/helm --namespace cinemaabyss --dry-run --debug
+   ```
+
+### Очистка
+
+```bash
+# Удаление через Helm
+helm uninstall cinemaabyss -n cinemaabyss
+
+# Удаление namespace
+kubectl delete namespace cinemaabyss
+
+# Удаление записи из hosts
+sudo sed -i '/cinemaabyss.example.com/d' /etc/hosts
+```

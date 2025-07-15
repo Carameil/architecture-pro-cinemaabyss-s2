@@ -660,6 +660,49 @@ minikube tunnel
 https://cinemaabyss.example.com/api/movies
 и приложите скриншот развертывания helm и вывода https://cinemaabyss.example.com/api/movies
 
+### Выполненная работа по заданию 4
+
+#### Helm Charts Implementation
+✅ **Успешно реализованы и протестированы Helm charts для всех сервисов:**
+
+**Обновление конфигурации:**
+- ✅ Обновлен `values.yaml` с правильными путями к образам (`ghcr.io/carameil/architecture-pro-cinemaabyss-s2/`)
+- ✅ Настроен корректный `imagePullSecret` для доступа к приватному реестру
+- ✅ Конфигурированы ресурсы и переменные окружения для всех сервисов
+
+**Шаблонизация сервисов:**
+- ✅ Заполнен шаблон `proxy-service.yaml` с полной конфигурацией:
+  - Deployment с правильными environment variables для Strangler Fig
+  - Service для внутренней маршрутизации
+  - Health checks и resource limits
+- ✅ Заполнен шаблон `events-service.yaml` с полной конфигурацией:
+  - Deployment с интеграцией Kafka
+  - Service для доступа к Events API
+  - Health checks и resource limits
+
+**Результаты развертывания:**
+- ✅ Успешная установка через `helm install cinemaabyss ./src/kubernetes/helm`
+- ✅ Все 7 подов запущены и работают корректно
+- ✅ API доступен через Ingress без дополнительной настройки
+- ✅ Proxy Service маршрутизирует запросы корректно
+
+**Верификация функциональности:**
+- ✅ `/api/movies` возвращает корректный JSON с фильмами
+- ✅ `/health` возвращает статус Proxy Service
+- ✅ Strangler Fig pattern работает с настройками из values.yaml
+- ✅ Events Service готов к обработке событий
+
+#### Скриншоты результатов
+
+**Helm Installation Success:**
+![Helm Install](./images/helm-install-success.png)
+
+**API Response через Helm Deployment:**
+![Helm API Response](./images/helm-api-movies-response.png)
+
+#### Инструкции для воспроизведения
+Подробные пошаговые инструкции для проверки задания 4 доступны в [APP_INFO.md - Раздел Helm](./APP_INFO.md#helm-задание-4)
+
 
 # Задание 5
 Компания планирует активно развиваться и для повышения надежности, безопасности, реализации сетевых паттернов типа Circuit Breaker и канареечного деплоя вам как архитектору необходимо развернуть istio и настроить circuit breaker для monolith и movies сервисов.
