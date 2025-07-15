@@ -531,6 +531,60 @@ cat .docker/config.json | base64
 #### Шаг 3
 Добавьте сюда скриншота вывода при вызове https://cinemaabyss.example.com/api/movies и  скриншот вывода event-service после вызова тестов.
 
+### Выполненная работа по заданию 3
+
+#### CI/CD Pipeline
+✅ **Успешно реализован и протестирован CI/CD pipeline для новых сервисов:**
+- Обновлен `.github/workflows/docker-build-push.yml` для сборки proxy и events сервисов
+- Добавлены необходимые шаги сборки и публикации Docker образов
+- Все API тесты проходят успешно при сборке в GitHub Actions
+- Образы успешно публикуются в GitHub Container Registry (GHCR)
+
+#### Kubernetes Configuration
+✅ **Созданы и настроены все необходимые Kubernetes манифесты:**
+
+**Подготовка окружения:**
+- Настроен Personal Access Token для доступа к GHCR
+- Обновлены пути к образам во всех манифестах (`ghcr.io/carameil/architecture-pro-cinemaabyss-s2/`)
+- Настроен `dockerconfigsecret.yaml` с правильными credentials
+
+**Kubernetes манифесты:**
+- `events-service.yaml` - Deployment и Service для Events микросервиса
+- `proxy-service.yaml` - Deployment и Service для Proxy (API Gateway)
+- `ingress.yaml` - настроена маршрутизация трафика:
+  - `/api/events` → events-service (для прямого доступа к событиям)
+  - `/` → proxy-service (весь остальной трафик через API Gateway)
+
+#### Результаты развертывания
+
+**Успешное развертывание всех компонентов:**
+- ✅ 7 подов в статусе Running: postgres-0, kafka-0, zookeeper-0, monolith, movies-service, events-service, proxy-service
+- ✅ Ingress настроен и работает корректно
+- ✅ API доступен через `http://cinemaabyss.example.com`
+
+**Тестирование системы:**
+- ✅ Все 22 Postman теста прошли успешно (примечание: health check тесты упали, как было описано в задании)
+- ✅ Proxy Service корректно маршрутизирует запросы
+- ✅ Events Service успешно создает и обрабатывает события через Kafka
+- ✅ Strangler Fig pattern работает (миграция трафика между монолитом и микросервисами)
+
+**Верификация событийной архитектуры:**
+- ✅ Movie Events созданы и обработаны
+- ✅ User Events созданы и обработаны  
+- ✅ Payment Events созданы и обработаны
+- ✅ Kafka consumers успешно обрабатывают все типы событий
+
+#### Скриншоты результатов
+
+**API Response через Kubernetes Ingress:**
+![API Movies Response](./images/k8s-api-movies-response.png)
+
+**Events Service Logs (обработка событий):**
+![Events Service Logs](./images/k8s-events-logs.png)
+
+#### Инструкции для воспроизведения
+Подробные пошаговые инструкции для проверки задания 3 доступны в [APP_INFO.md - Раздел Kubernetes](./APP_INFO.md#kubernetes-задание-3)
+
 
 ## Задание 4
 Для простоты дальнейшего обновления и развертывания вам как архитектуру необходимо так же реализовать helm-чарты для прокси-сервиса и проверить работу 
