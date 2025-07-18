@@ -1,0 +1,100 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title C4 Container Diagram - CinemaAbyss To-Be Architecture
+
+Person(user, "User", "CinemaAbyss platform user")
+Person(admin, "Administrator", "Manages content and system")
+
+System_Ext(paymentGateway, "Payment Gateway", "External payment system (Stripe, PayPal)")
+System_Ext(emailService, "Email Service", "External email service (SendGrid)")
+System_Ext(recommendationAPI, "Recommendation API", "External recommendation system")
+
+System_Boundary(cinemaAbyss, "CinemaAbyss Platform") {
+    Container(webApp, "Web Application", "React", "Web interface for users")
+    Container(mobileApp, "Mobile Application", "React Native", "Mobile application")
+    Container(adminPortal, "Admin Portal", "React", "Administrative interface")
+    
+    Container(apiGateway, "API Gateway", "Kong/Nginx", "Single entry point, routing, authentication")
+    
+    ' Core Services
+    Container(userService, "User Service", "Go", "User management, authentication")
+    Container(movieService, "Movie Service", "Go", "Movie catalog, metadata")
+    Container(paymentService, "Payment Service", "Java Spring", "Payment processing")
+    Container(subscriptionService, "Subscription Service", "Java Spring", "Subscription management")
+    
+    ' Supporting Services
+    Container(analyticsService, "Analytics Service", "Go", "Analytics and recommendations integration")
+    Container(notificationService, "Notification Service", "Go", "Notification delivery")
+    Container(eventService, "Event Service", "Go", "Event processing")
+    
+    ' Data Stores
+    ContainerDb(userDb, "User Database", "PostgreSQL", "User data")
+    ContainerDb(movieDb, "Movie Database", "PostgreSQL", "Movie catalog")
+    ContainerDb(paymentDb, "Payment Database", "PostgreSQL", "Payment data")
+    ContainerDb(subscriptionDb, "Subscription Database", "PostgreSQL", "Subscription data")
+    ContainerDb(analyticsDb, "Analytics Database", "СlickHouse", "User behavior and analytics data")
+    
+    ' Infrastructure
+    Container(kafka, "Apache Kafka", "Kafka", "Event message broker")
+    ContainerDb(redis, "Redis Cache", "Redis", "Caching and sessions")
+    Container(elasticsearch, "Elasticsearch", "Elasticsearch", "Movie catalog search")
+}
+
+' User interactions
+Rel(user, webApp, "Uses", "HTTPS")
+Rel(user, mobileApp, "Uses", "HTTPS")
+Rel(admin, adminPortal, "Manages", "HTTPS")
+
+' Frontend to Backend
+Rel(webApp, apiGateway, "API requests", "HTTPS/REST")
+Rel(mobileApp, apiGateway, "API requests", "HTTPS/REST")
+Rel(adminPortal, apiGateway, "API requests", "HTTPS/REST")
+
+' API Gateway routing
+Rel(apiGateway, userService, "Routes requests", "HTTP/REST")
+Rel(apiGateway, movieService, "Routes requests", "HTTP/REST")
+Rel(apiGateway, paymentService, "Routes requests", "HTTP/REST")
+Rel(apiGateway, subscriptionService, "Routes requests", "HTTP/REST")
+Rel(apiGateway, analyticsService, "Routes requests", "HTTP/REST")
+Rel(apiGateway, notificationService, "Routes requests", "HTTP/REST")
+
+' Service to Database
+Rel(userService, userDb, "Reads/Writes", "SQL")
+Rel(movieService, movieDb, "Reads/Writes", "SQL")
+Rel(paymentService, paymentDb, "Reads/Writes", "SQL")
+Rel(subscriptionService, subscriptionDb, "Reads/Writes", "SQL")
+Rel(analyticsService, analyticsDb, "Reads/Writes", "SQL")
+
+' Event-driven communication
+Rel(userService, kafka, "Publishes events", "Kafka Protocol")
+Rel(movieService, kafka, "Publishes events", "Kafka Protocol")
+Rel(paymentService, kafka, "Publishes events", "Kafka Protocol")
+Rel(subscriptionService, kafka, "Publishes events", "Kafka Protocol")
+
+Rel(eventService, kafka, "Reads/Writes events", "Kafka Protocol")
+Rel(analyticsService, kafka, "Subscribes to events", "Kafka Protocol")
+Rel(notificationService, kafka, "Subscribes to events", "Kafka Protocol")
+
+' Synchronous service interactions
+Rel(subscriptionService, userService, "Validates user", "HTTP/REST")
+Rel(subscriptionService, paymentService, "Initiates payment", "HTTP/REST")
+Rel(analyticsService, movieService, "Gets movie metadata", "HTTP/REST")
+
+' External integrations
+Rel(paymentService, paymentGateway, "Processes payments", "HTTPS")
+Rel(notificationService, emailService, "Sends emails", "HTTPS")
+Rel(analyticsService, recommendationAPI, "Gets recommendations", "HTTPS")
+
+' Caching
+Rel(userService, redis, "Session cache", "Redis Protocol")
+Rel(movieService, redis, "Metadata cache", "Redis Protocol")
+Rel(apiGateway, redis, "Rate limiting", "Redis Protocol")
+
+' Search
+Rel(movieService, elasticsearch, "Indexes movies", "HTTP")
+Rel(apiGateway, elasticsearch, "Movie search", "HTTP")
+
+@enduml 
