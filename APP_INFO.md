@@ -643,3 +643,112 @@ kubectl delete namespace cinemaabyss
 # Удаление записи из hosts
 sudo sed -i '/cinemaabyss.example.com/d' /etc/hosts
 ```
+
+## Istio & Circuit Breaker (Задание 5)
+
+### Предварительные требования
+- Minikube установлен и запущен (`minikube start`).
+- kubectl настроен для работы с кластером.
+- Helm установлен (версия 3.x).
+
+### 1. Установка Istio
+
+**Шаг 1: Добавить Helm репозиторий Istio**
+```bash
+helm repo add istio https://istio-release.storage.googleapis.com/charts
+helm repo update
+```
+
+**Шаг 2: Установить компоненты Istio в правильном порядке**
+*Важно использовать `--wait`, чтобы каждый компонент был готов перед установкой следующего.*
+```bash
+# Установка базовых CRD
+helm install istio-base istio/base -n istio-system --set defaultRevision=default --create-namespace
+
+# Установка ядра Istio (istiod)
+helm install istiod istio/istiod -n istio-system --wait
+
+# Установка Ingress Gateway
+helm install istio-ingressgateway istio/gateway -n istio-system --wait
+```
+
+**Шаг 3: Проверить установку Istio**
+```bash
+kubectl get pods -n istio-system
+```
+*Оба пода (`istiod` и `istio-ingressgateway`) должны быть в статусе `Running`.*
+
+### 2. Развертывание приложения в Service Mesh
+
+**Шаг 1: Развернуть приложение с помощью Helm**
+```bash
+helm install cinemaabyss ./src/kubernetes/helm --namespace cinemaabyss --create-namespace
+```
+
+**Шаг 2: Включить автоматическую инъекцию Istio Sidecar**
+```bash
+kubectl label namespace cinemaabyss istio-injection=enabled --overwrite
+```
+
+**Шаг 3: Перезапустить все сервисы для внедрения прокси**
+*Это необходимо, так как инъекция происходит только при создании подов.*
+```bash
+kubectl rollout restart deployment -n cinemaabyss monolith
+kubectl rollout restart deployment -n cinemaabyss movies-service
+kubectl rollout restart deployment -n cinemaabyss events-service
+kubectl rollout restart deployment -n cinemaabyss proxy-service
+```
+
+**Шаг 4: Проверить статус подов**
+```bash
+kubectl get pods -n cinemaabyss
+```
+*Убедитесь, что все поды `Running`, а у сервисов (`monolith`, `movies-service` и т.д.) `READY` статус `2/2`.*
+
+### 3. Настройка и проверка Circuit Breaker
+
+**Шаг 1: Применить конфигурацию Circuit Breaker**
+```bash
+kubectl apply -f src/kubernetes/circuit-breaker-config.yaml -n cinemaabyss
+```
+
+**Шаг 2: Развернуть клиент для нагрузочного тестирования (Fortio)**
+```bash
+kubectl apply -f https://raw.githubusercontent.com/istio/istio/release-1.25/samples/httpbin/sample-client/fortio-deploy.yaml -n cinemaabyss
+```
+
+**Шаг 3: Запустить нагрузочный тест**
+```bash
+# Получаем имя пода Fortio
+FORTIO_POD=$(kubectl get pod -n cinemaabyss | grep fortio | awk '{print $1}')
+
+# Запускаем тест
+kubectl exec -n cinemaabyss $FORTIO_POD -c fortio -- fortio load -c 50 -qps 0 -n 500 -loglevel Warning http://movies-service:8081/api/movies
+```
+*Ожидаемый результат: смесь кодов `200` (успех) и `503` (сервис недоступен - сработал Circuit Breaker).*
+
+**Шаг 4: Проверить статистику Istio**
+*Эта команда покажет, сколько запросов было заблокировано.*
+```bash
+kubectl exec -n cinemaabyss $FORTIO_POD -c istio-proxy -- pilot-agent request GET stats | grep movies-service | grep "pending"
+```
+*Ищите ненулевое значение у `upstream_rq_pending_overflow`.*
+
+### 4. Очистка окружения
+
+```bash
+# Удаляем Helm-релиз приложения
+helm uninstall cinemaabyss -n cinemaabyss
+
+# Удаляем Fortio
+kubectl delete -f https://raw.githubusercontent.com/istio/istio/release-1.25/samples/httpbin/sample-client/fortio-deploy.yaml -n cinemaabyss
+
+# Удаляем namespace приложения
+kubectl delete namespace cinemaabyss
+
+# Удаляем Istio
+helm uninstall istio-ingressgateway -n istio-system
+helm uninstall istiod -n istio-system
+helm uninstall istio-base -n istio-system
+kubectl delete namespace istio-system
+```

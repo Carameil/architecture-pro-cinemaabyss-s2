@@ -769,6 +769,43 @@ You can see 21 for the upstream_rq_pending_overflow value which means 21 calls s
 
 Приложите скриншот работы circuit breaker'а
 
+### Выполненная работа по заданию 5
+
+#### Istio Service Mesh & Circuit Breaker
+✅ **Успешно развернут Istio и настроен Circuit Breaker для повышения отказоустойчивости:**
+
+**1. Установка и настройка Istio:**
+- ✅ Helm-репозиторий Istio успешно добавлен и обновлен.
+- ✅ Установлены все ключевые компоненты Istio: `istio-base`, `istiod`, и `istio-ingressgateway`.
+- ✅ Решены проблемы с порядком установки и `ImagePullBackOff` для ingress gateway.
+- ✅ Для namespace `cinemaabyss` включена автоматическая инъекция sidecar-прокси (`istio-injection=enabled`).
+
+**2. Развертывание приложения в Service Mesh:**
+- ✅ Приложение успешно развернуто в namespace `cinemaabyss`.
+- ✅ Все сервисы (`monolith`, `movies-service`, `events-service`, `proxy-service`) были перезапущены для корректного внедрения Istio sidecar.
+- ✅ Проверено, что все ключевые поды работают в режиме `2/2`, подтверждая наличие sidecar-прокси.
+- ✅ Успешно решена проблема с `CrashLoopBackOff` у Kafka путем очистки старого Persistent Volume.
+
+**3. Конфигурация Circuit Breaker:**
+- ✅ Создан и применен файл `src/kubernetes/circuit-breaker-config.yaml` с `DestinationRule` для `monolith` и `movies-service`.
+- ✅ Настроены политики `connectionPool` и `outlierDetection` для ограничения количества одновременных подключений и автоматического исключения нездоровых экземпляров сервиса.
+
+**4. Нагрузочное тестирование с Fortio:**
+- ✅ Развернут тестовый клиент Fortio в кластере.
+- ✅ Запущен нагрузочный тест на `movies-service` (50 одновременных подключений, 500 запросов).
+- ✅ **Результаты теста подтвердили срабатывание Circuit Breaker:**
+  - **~33%** запросов были успешными (код `200`).
+  - **~67%** запросов были отклонены Istio (код `503`), что предотвратило падение сервиса.
+- ✅ Статистика Istio (`upstream_rq_pending_overflow: 334`) полностью совпала с количеством отклоненных запросов, что является прямым доказательством работы Circuit Breaker.
+
+#### Скриншот результатов
+
+**Результаты теста Fortio и статистики Istio:**
+![Fortio Circuit Breaker Test](./images/istio-fortio-circuit-breaker.png)
+
+#### Инструкции для воспроизведения
+Подробные пошаговые инструкции для проверки задания 5 доступны в [APP_INFO.md - Раздел Istio & Circuit Breaker](./APP_INFO.md#istio--circuit-breaker-задание-5)
+
 Удаляем все
 ```bash
 istioctl uninstall --purge
